@@ -1,0 +1,172 @@
+//Credits & Thanks at Alexander: https://alexbloggt.com/esp8266-smarthome-gateway/
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <RCSwitch.h>
+#include <IRremoteESP8266.h>
+#include <DHT.h>
+
+// WLAN data
+const char* ssid = "xxx";
+const char* password = "xxx";
+
+// static IP
+IPAddress ip(192,168,11,60);
+IPAddress gateway(192,168,11,1);
+IPAddress subnet(255,255,255,0);
+MDNSResponder mdns;
+ESP8266WebServer server(80);
+
+// set your pin for ir led here
+IRsend irsend(14);
+
+// initialize RCSwitch
+RCSwitch mySwitch = RCSwitch();
+
+// initialize DHT sensor
+DHT dht(13,DHT11,15);
+float humidity, temperature;
+
+void handleRoot() {
+ server.send(200, "text/html", "Please specify command!</br>Form IR: /ir?code=xxx&bits=xx&protocol=x</br>Form RC: /rc?group=xxxx&switch=xxxx&action=x</br>Form DHT: /dht?type=x");
+}
+
+void handleIr(){
+  String codestring=server.arg("code");
+  String protocol=server.arg("protocol");
+  String bitsstring=server.arg("bits");
+  String webOutput = "Protocol: "+protocol+"; Code: "+codestring+"; Bits: "+bitsstring;
+  if ((codestring != "")&&(bitsstring != "")){
+    unsigned long code = codestring.toInt();
+    int bits = bitsstring.toInt();
+    if (protocol == "NEC"){
+      irsend.sendNEC(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else if (protocol == "Sony"){
+      irsend.sendSony(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else if (protocol == "Whynter"){
+      irsend.sendWhynter(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else if (protocol == "LG"){
+      irsend.sendLG(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else if (protocol == "RC5"){
+      irsend.sendRC5(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else if (protocol == "RC6"){
+      irsend.sendRC6(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else if (protocol == "DISH"){
+      irsend.sendDISH(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else if (protocol == "SharpRaw"){
+      irsend.sendSharpRaw(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else if (protocol == "Samsung"){
+      irsend.sendSAMSUNG(code, bits);
+      server.send(200, "text/html", webOutput);
+    }
+    else {
+      server.send(200, "text/html", "Protocol not implemented!");
+    }
+  }
+  else {
+    server.send(200, "text/html", "Missing code or bits!");
+  }
+}
+
+void handleRc(){
+  String groupstring=server.arg("group");
+  String switchstring=server.arg("switch");
+  String actionstring=server.arg("action");
+  String webOutput = "Group: "+groupstring+"; Switch: "+switchstring+"; Action: "+actionstring;
+  char groupchar[groupstring.length()+1];
+  groupstring.toCharArray(groupchar, groupstring.length()+1);
+  char switchchar[switchstring.length()+1];
+  switchstring.toCharArray(switchchar, switchstring.length()+1);
+  if(actionstring=="1"){
+    mySwitch.switchOn(groupchar, switchchar);
+    server.send(200, "text/html", webOutput);
+  }
+  else if(actionstring=="0"){
+    mySwitch.switchOff(groupchar, switchchar);
+    server.send(200, "text/html", webOutput);
+  }
+  else{
+    server.send(200, "text/html", "Wrong action code!");
+  }
+}
+
+void handleDHT(){
+  getDHT();
+  String typestring=server.arg("type");
+  String temp_str = String((int)temperature);
+  String hum_str = String((int)humidity);
+  if(typestring=="temp"){
+    server.send(200, "text/html", temp_str);
+  }
+  else if(typestring=="hum"){
+    server.send(200, "text/html", hum_str);
+  }
+  else{
+    String webOutput = temp_str+";"+hum_str;
+    server.send(200, "text/html", webOutput);
+  }
+}
+
+void handleNotFound(){
+  server.send(404, "text/plain", "404");
+}
+
+void getDHT(){
+  humidity = dht.readHumidity();
+  temperature = dht.readTemperature(false);
+  if (isnan(humidity) || isnan(temperature)) {
+    Serial.println("Failed to read from DHT sensor!");
+    return;
+  }
+}
+
+void setup(void){
+  mySwitch.enableTransmit(12);
+  irsend.begin();
+  dht.begin();
+  Serial.begin(9600);
+  WiFi.begin(ssid, password);
+  WiFi.config(ip, gateway, subnet);
+  Serial.println("");
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+  if (mdns.begin("esp8266", WiFi.localIP())) {
+    Serial.println("MDNS responder started");
+  }
+  server.on("/", handleRoot);
+  server.on("/ir", handleIr);
+  server.on("/rc", handleRc);
+  server.on("/dht", handleDHT);
+  server.onNotFound(handleNotFound);
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
+void loop(void){
+  server.handleClient();
+}
