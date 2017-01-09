@@ -18,7 +18,7 @@ IPAddress subnet(255,255,255,0);
 MDNSResponder mdns;
 ESP8266WebServer server(80);
 
-// set your pin for ir led here
+// set your pin for IR LED here
 IRsend irsend(14);
 
 // initialize RCSwitch
@@ -36,10 +36,13 @@ void handleIr(){
   String codestring=server.arg("code");
   String protocol=server.arg("protocol");
   String bitsstring=server.arg("bits");
+  
   String webOutput = "Protocol: "+protocol+"; Code: "+codestring+"; Bits: "+bitsstring;
+  
   if ((codestring != "")&&(bitsstring != "")){
     unsigned long code = codestring.toInt();
     int bits = bitsstring.toInt();
+    
     if (protocol == "NEC"){
       irsend.sendNEC(code, bits);
       server.send(200, "text/html", webOutput);
