@@ -30,7 +30,7 @@ float humidity, temperature;
 
 void handleRoot() {
  server.send(200, "text/html", "Please specify command!</br>Form IR: /ir?code=xxx&bits=xx&protocol=x</br>Form RC: /rc?group=xxxx&switch=xxxx&action=x</br>Form DHT: /dht?type=x");
-}
+} //Hier ein Beispiel: http://192.168.11.60/ir?code=16666799&bits=32&protocol=NEC
 
 void handleIr(){
   String codestring=server.arg("code");
@@ -47,10 +47,15 @@ void handleIr(){
       irsend.sendNEC(code, bits);
       server.send(200, "text/html", webOutput);
     }
+    
+    //Example for sending a code 3 times
     else if (protocol == "Sony"){
-      irsend.sendSony(code, bits);
-      server.send(200, "text/html", webOutput);
+    for (int i = 0; i < 3; i++){
+        irsend.sendSony(code, bits);
+        }
+    server.send(200, "text/html", webOutput);
     }
+    
     else if (protocol == "Whynter"){
       irsend.sendWhynter(code, bits);
       server.send(200, "text/html", webOutput);
